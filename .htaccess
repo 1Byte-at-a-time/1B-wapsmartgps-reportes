@@ -1,0 +1,11 @@
+Options +SymLinksIfOwnerMatch
+RewriteEngine On
+
+# Allow Installatron requests
+RewriteCond %{REQUEST_FILENAME} deleteme\.\w+\.php
+RewriteRule (.*) - [L] 
+
+RewriteRule ^ index.php [L]
+php_value date.timezone 'America/Bogota'
+
+php_value max_execution_time 600

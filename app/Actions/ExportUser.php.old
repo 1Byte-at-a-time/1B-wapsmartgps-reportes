@@ -1,0 +1,126 @@
+<?php
+
+namespace App\Actions;
+
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use TCG\Voyager\Actions\AbstractAction;
+use App\Report;
+
+
+class ExportUser extends AbstractAction
+{
+    public function getTitle()
+    {
+        return 'Descargar reporte';
+    }
+
+    public function getIcon()
+    {
+        return "voyager-receipt";
+    }
+
+    public function getPolicy()
+    {
+        return 'read';
+    }
+
+    public function getAttributes()
+    {
+        return [
+            'class' => 'btn btn-sm btn-warning',
+        ];
+    }
+
+    public function getDefaultRoute()
+    {
+        return '';
+    }
+
+    public function shouldActionDisplayOnDataType()
+    {
+        return true;
+    }
+
+    public function massAction($ids, $comingFrom)
+    {
+        $profile = Auth::user();
+        switch (true) {
+            case str_contains($this->dataType->model_name, 'User'):
+                $data = app($this->dataType->model_name)->all();
+                if ($profile->role_id != 1) {
+                    $data = $data->where('center_id', Auth::user()->center_id);
+                    $data->all();
+                }
+
+                break;
+            case str_contains($this->dataType->model_name, 'Vehicle'):
+                $data = app($this->dataType->model_name)->all();
+                if ($profile->role_id != 1) {
+                    $data = $data->where('center_id', Auth::user()->center_id);
+                    $data->all();
+                }
+                break;
+                case str_contains($this->dataType->model_name, 'Center'):
+                    $data = app($this->dataType->model_name)->all();
+                    if ($profile->role_id != 1) {
+                        $data = $data->where('id', Auth::user()->center_id);
+                        $data->all();
+                    }
+                    break;    
+            case str_contains($this->dataType->model_name, 'Report'):
+                $data = $profile->role_id == 1 ? app($this->dataType->model_name)->all() : DB::select(
+                    'select distinct * from reports as r
+                     inner join  users as u on r.sign_id= u.id
+                     where u.center_id=?;',
+                    [$profile->center_id],
+                );
+                break;
+
+        }
+
+        $fileName = "{$this->dataType->slug}.csv";
+
+        if (sizeof($data) === 0) return dd('No data to export!');
+
+        if (!str_contains($this->dataType->model_name, 'Report')) {
+
+            $columns =  array_keys($data->first()->toArray());
+        } else {
+            $dataColumns = collect($data[0]);
+            $data=collect($data);
+            $columns = array_keys($dataColumns->toArray());
+        }
+
+        $headers = array(
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        );
+
+        $callback = function () use ($data, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns,';');
+
+            foreach ($data as $data_col) {
+                if(str_contains($this->dataType->model_name, 'Report')){
+                    $values = json_decode(json_encode($data_col), true);
+                    $values=array_values($values);
+                }else{
+                 $values = array_values($data_col->toArray());
+                }
+                for ($i = 0; $i < sizeof($values); $i++) {
+                    if (is_array($values[$i])) $values[$i] = json_encode($values[$i]);
+                }
+
+                fputcsv($file, $values,';');
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+}

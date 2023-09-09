@@ -1,0 +1,8 @@
+/* Checkbox width */
+.toggle.btn {
+  width:8.5rem !important;
+}
+/*hide elements */
+.d-none {
+    display: none !important;
+}
