@@ -28,4 +28,9 @@ class Vehicle extends Model
         }
         
     }
+
+    public function scopeType($query, string $type)
+    {
+        return $query->where('type_vehicle', $type);
+    }
 }
